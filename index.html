@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Room Dungeon FPS</title>
+<title>Dungeon FPS - Full Vision</title>
 
 <style>
 body { margin:0; overflow:hidden; }
@@ -59,6 +59,8 @@ let rand;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 
+scene.fog = new THREE.Fog(0x000000, 10, 60);
+
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(innerWidth,innerHeight);
 document.body.appendChild(renderer.domElement);
@@ -86,26 +88,13 @@ player.position.set(0,2,0);
 
 
 // =====================
-// FLASHLIGHT (LOOK DIRECTION LIGHT)
+// FULL-VISION LIGHT (NO FLASHLIGHT CONE)
 // =====================
 
-const flashlight = new THREE.SpotLight(
-0xffffff,
-140,
-70,
-Math.PI/5,
-0.4
-);
+const viewLight = new THREE.DirectionalLight(0xffffff, 1.2);
+scene.add(viewLight);
 
-camera.add(flashlight);
-camera.add(flashlight.target);
-
-
-// =====================
-// LIGHT AMBIENCE
-// =====================
-
-scene.add(new THREE.AmbientLight(0x111111));
+scene.add(new THREE.AmbientLight(0x222222));
 
 
 // =====================
@@ -134,7 +123,6 @@ rand = RNG(seed);
 grid = [];
 rooms = [];
 
-// fill walls
 for(let x=0;x<size;x++){
 grid[x]=[];
 for(let z=0;z<size;z++){
@@ -142,11 +130,7 @@ grid[x][z]=1;
 }
 }
 
-
-// ---------------------
-// CREATE ROOMS
-// ---------------------
-
+// create rooms
 let roomCount = 6 + Math.floor(rand()*5);
 
 for(let i=0;i<roomCount;i++){
@@ -159,7 +143,6 @@ let z = Math.floor(rand()*(size-h-2))+1;
 
 rooms.push({x,z,w,h});
 
-// carve room
 for(let rx=0;rx<w;rx++){
 for(let rz=0;rz<h;rz++){
 grid[x+rx][z+rz]=0;
@@ -168,11 +151,7 @@ grid[x+rx][z+rz]=0;
 
 }
 
-
-// ---------------------
-// CONNECT ROOMS
-// ---------------------
-
+// connect rooms
 for(let i=0;i<rooms.length-1;i++){
 
 let a = rooms[i];
@@ -184,16 +163,14 @@ let az = a.z + Math.floor(a.h/2);
 let bx = b.x + Math.floor(b.w/2);
 let bz = b.z + Math.floor(b.h/2);
 
-// horizontal corridor
-while(ax !== bx){
+while(ax!==bx){
 grid[ax][az]=0;
-ax += ax < bx ? 1 : -1;
+ax += ax<bx?1:-1;
 }
 
-// vertical corridor
-while(az !== bz){
+while(az!==bz){
 grid[ax][az]=0;
-az += az < bz ? 1 : -1;
+az += az<bz?1:-1;
 }
 
 grid[ax][az]=0;
@@ -211,26 +188,24 @@ buildWorld();
 
 function buildWorld(){
 
-// clear meshes
 for(let i=scene.children.length-1;i>=0;i--){
 if(scene.children[i].isMesh)
 scene.remove(scene.children[i]);
 }
 
-colliders = [];
+colliders=[];
 
-// ambient light
-scene.add(new THREE.AmbientLight(0x111111));
+scene.add(new THREE.AmbientLight(0x222222));
 
 for(let x=0;x<size;x++){
 for(let z=0;z<size;z++){
 
-let wx = (x-size/2)*cellSize;
-let wz = (z-size/2)*cellSize;
+let wx=(x-size/2)*cellSize;
+let wz=(z-size/2)*cellSize;
 
 if(grid[x][z]===1){
 
-let wall = new THREE.Mesh(
+let wall=new THREE.Mesh(
 new THREE.BoxGeometry(cellSize,3,cellSize),
 wallMat
 );
@@ -242,7 +217,7 @@ colliders.push(wall);
 
 }else{
 
-let floor = new THREE.Mesh(
+let floor=new THREE.Mesh(
 new THREE.BoxGeometry(cellSize,0.2,cellSize),
 floorMat
 );
@@ -282,8 +257,8 @@ pitchRot -= e.movementY*0.002;
 
 pitchRot = Math.max(-1.5,Math.min(1.5,pitchRot));
 
-yaw.rotation.y = yawRot;
-pitch.rotation.x = pitchRot;
+yaw.rotation.y=yawRot;
+pitch.rotation.x=pitchRot;
 
 }
 
@@ -305,7 +280,7 @@ new THREE.Vector3(0.6,1.8,0.6)
 
 for(let obj of colliders){
 
-let box = new THREE.Box3().setFromObject(obj);
+let box=new THREE.Box3().setFromObject(obj);
 
 if(playerBox.intersectsBox(box))
 return false;
@@ -323,17 +298,17 @@ return true;
 
 function move(){
 
-let speed = 0.09;
+let speed=0.09;
 
-let forward = new THREE.Vector3();
+let forward=new THREE.Vector3();
 camera.getWorldDirection(forward);
-forward.y = 0;
+forward.y=0;
 forward.normalize();
 
-let right = new THREE.Vector3();
+let right=new THREE.Vector3();
 right.crossVectors(camera.up,forward);
 
-let move = new THREE.Vector3();
+let move=new THREE.Vector3();
 
 if(keys.KeyW)move.add(forward);
 if(keys.KeyS)move.sub(forward);
@@ -342,7 +317,7 @@ if(keys.KeyD)move.sub(right);
 
 move.normalize().multiplyScalar(speed);
 
-let next = player.position.clone().add(move);
+let next=player.position.clone().add(move);
 
 if(canMove(next)){
 player.position.copy(next);
@@ -355,7 +330,7 @@ player.position.copy(next);
 // SAVE / LOAD
 // =====================
 
-window.saveGame = function(){
+window.saveGame=function(){
 
 localStorage.setItem("dungeonSave",JSON.stringify({
 seed,
@@ -366,21 +341,21 @@ z:player.position.z
 
 };
 
-window.loadGame = function(){
+window.loadGame=function(){
 
-let d = JSON.parse(localStorage.getItem("dungeonSave"));
-if(!d) return;
+let d=JSON.parse(localStorage.getItem("dungeonSave"));
+if(!d)return;
 
-seed = d.seed;
+seed=d.seed;
 player.position.set(d.x,d.y,d.z);
 
 generateDungeon();
 
 };
 
-window.newGame = function(){
+window.newGame=function(){
 
-seed = Math.floor(Math.random()*999999);
+seed=Math.floor(Math.random()*999999);
 player.position.set(0,2,0);
 generateDungeon();
 
@@ -388,7 +363,23 @@ generateDungeon();
 
 
 // =====================
-// GAME LOOP
+// LIGHT FOLLOWS VIEW (NO CONE)
+// =====================
+
+function updateLight(){
+
+camera.getWorldDirection(viewLight.position);
+viewLight.position.multiplyScalar(-1);
+viewLight.position.add(player.position);
+
+viewLight.target.position.copy(player.position);
+scene.add(viewLight.target);
+
+}
+
+
+// =====================
+// LOOP
 // =====================
 
 function animate(){
@@ -397,9 +388,7 @@ requestAnimationFrame(animate);
 
 move();
 
-// 🔦 flashlight follows EXACT view direction automatically
-flashlight.position.set(0,0,0);
-flashlight.target.position.set(0,0,-1);
+updateLight();
 
 renderer.render(scene,camera);
 
@@ -411,7 +400,7 @@ animate();
 // resize
 addEventListener("resize",()=>{
 
-camera.aspect = innerWidth/innerHeight;
+camera.aspect=innerWidth/innerHeight;
 camera.updateProjectionMatrix();
 renderer.setSize(innerWidth,innerHeight);
 
