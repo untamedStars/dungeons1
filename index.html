@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Raycaster Dungeon</title>
+<title>Raycaster Fixed</title>
 <style>
 body { margin: 0; overflow: hidden; background: black; }
 canvas { display: block; }
@@ -25,19 +25,14 @@ const FOV = Math.PI / 3;
 const MAX_DEPTH = 20;
 
 const player = {
-    x: 2,
-    y: 2,
+    x: 4,
+    y: 4,
     angle: 0,
     moveSpeed: 0.06,
     rotSpeed: 0.04
 };
 
-// ---------------- INPUT ----------------
-const keys = {};
-window.addEventListener("keydown", e => keys[e.key] = true);
-window.addEventListener("keyup", e => keys[e.key] = false);
-
-// ---------------- DUNGEON GENERATION ----------------
+// ---------------- MAP ----------------
 function createMap(w, h) {
     let map = Array.from({ length: h }, () =>
         Array.from({ length: w }, () => 1)
@@ -67,18 +62,23 @@ function createMap(w, h) {
     let rooms = [];
 
     for (let i = 0; i < 6; i++) {
-        let rw = 4 + Math.floor(Math.random() * 6);
-        let rh = 4 + Math.floor(Math.random() * 6);
+        let rw = 4 + Math.random() * 5;
+        let rh = 4 + Math.random() * 5;
 
-        let x = 2 + Math.floor(Math.random() * (w - rw - 4));
-        let y = 2 + Math.floor(Math.random() * (h - rh - 4));
+        let x = 2 + Math.random() * (w - rw - 4);
+        let y = 2 + Math.random() * (h - rh - 4);
+
+        x = Math.floor(x);
+        y = Math.floor(y);
+        rw = Math.floor(rw);
+        rh = Math.floor(rh);
 
         carveRoom(x, y, rw, rh);
 
-        let cx = x + Math.floor(rw / 2);
-        let cy = y + Math.floor(rh / 2);
-
-        rooms.push({ cx, cy });
+        rooms.push({
+            cx: x + Math.floor(rw / 2),
+            cy: y + Math.floor(rh / 2)
+        });
     }
 
     for (let i = 1; i < rooms.length; i++) {
@@ -92,32 +92,30 @@ function createMap(w, h) {
 
 const map = createMap(30, 30);
 
-// spawn in open area
-player.x = 4;
-player.y = 4;
-
 // ---------------- COLLISION ----------------
 function isWall(x, y) {
     if (x < 0 || y < 0 || x >= map[0].length || y >= map.length) return true;
     return map[Math.floor(y)][Math.floor(x)] === 1;
 }
 
-// ---------------- RAYCAST (DDA) ----------------
+// ---------------- RAYCAST ----------------
 function castRay(angle) {
+    let step = 0.05;
+
     let rayX = player.x;
     let rayY = player.y;
 
-    let sin = Math.sin(angle);
     let cos = Math.cos(angle);
+    let sin = Math.sin(angle);
 
-    for (let i = 0; i < MAX_DEPTH * 25; i++) {
-        rayX += cos * 0.04;
-        rayY += sin * 0.04;
+    for (let i = 0; i < MAX_DEPTH / step; i++) {
+        rayX += cos * step;
+        rayY += sin * step;
 
         if (isWall(rayX, rayY)) {
             let dist = Math.hypot(rayX - player.x, rayY - player.y);
 
-            // fish-eye correction
+            // fix fisheye
             dist *= Math.cos(angle - player.angle);
 
             return dist;
@@ -126,7 +124,12 @@ function castRay(angle) {
     return MAX_DEPTH;
 }
 
-// ---------------- MOVEMENT ----------------
+// ---------------- INPUT ----------------
+const keys = {};
+window.addEventListener("keydown", e => keys[e.key] = true);
+window.addEventListener("keyup", e => keys[e.key] = false);
+
+// ---------------- UPDATE ----------------
 function update() {
     if (keys["ArrowLeft"]) player.angle -= player.rotSpeed;
     if (keys["ArrowRight"]) player.angle += player.rotSpeed;
@@ -138,7 +141,6 @@ function update() {
         if (!isWall(player.x + dx, player.y)) player.x += dx;
         if (!isWall(player.x, player.y + dy)) player.y += dy;
     }
-
     if (keys["s"]) {
         if (!isWall(player.x - dx, player.y)) player.x -= dx;
         if (!isWall(player.x, player.y - dy)) player.y -= dy;
@@ -147,29 +149,36 @@ function update() {
 
 // ---------------- RENDER ----------------
 function render() {
-    ctx.fillStyle = "black";
-    ctx.fillRect(0, 0, W, H);
+    // SKY
+    ctx.fillStyle = "#111";
+    ctx.fillRect(0, 0, W, H/2);
+
+    // FLOOR
+    ctx.fillStyle = "#050505";
+    ctx.fillRect(0, H/2, W, H/2);
 
     for (let x = 0; x < W; x++) {
-        let rayAngle = player.angle - FOV / 2 + (x / W) * FOV;
+        let rayAngle = player.angle - FOV/2 + (x / W) * FOV;
         let dist = castRay(rayAngle);
 
-        let wallHeight = H / dist;
+        let wallHeight = H / (dist + 0.0001);
 
-        // FLASHLIGHT CONE EFFECT
+        // FLASHLIGHT CONE
         let angleDiff = Math.abs(rayAngle - player.angle);
-        let cone = Math.max(0, 1 - angleDiff / (FOV / 2));
+        let cone = 1 - (angleDiff / (FOV / 2));
+        cone = Math.max(0, cone);
 
-        // distance lighting
-        let light = Math.max(0, 255 - dist * 30);
+        // distance shading (IMPORTANT FIX)
+        let shade = 255 / (1 + dist * dist * 0.15);
+        shade *= cone;
 
-        let brightness = light * cone;
+        shade = Math.max(0, Math.min(255, shade));
 
-        ctx.fillStyle = `rgb(${brightness},${brightness},${brightness})`;
+        ctx.fillStyle = `rgb(${shade},${shade},${shade})`;
 
         ctx.fillRect(
             x,
-            (H / 2) - wallHeight / 2,
+            (H/2) - wallHeight/2,
             1,
             wallHeight
         );
@@ -185,5 +194,6 @@ function loop() {
 
 loop();
 </script>
+
 </body>
 </html>
