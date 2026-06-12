@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>3D Dungeon</title>
+
+<style>
+body {
+    margin: 0;
+    overflow: hidden;
+}
+
+canvas {
+    display:block;
+}
+</style>
+
+</head>
+
+<body>
+
+<script type="module">
+
+import * as THREE from 
+"https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js";
+
+
+// =================
+// SETUP
+// =================
+
+const scene = new THREE.Scene();
+
+scene.background = new THREE.Color(0x000000);
+
+
+const camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+);
+
+
+const renderer = new THREE.WebGLRenderer();
+
+renderer.setSize(
+    window.innerWidth,
+    window.innerHeight
+);
+
+document.body.appendChild(
+    renderer.domElement
+);
+
+
+
+// =================
+// DUNGEON
+// =================
+
+
+const wallMat = new THREE.MeshStandardMaterial({
+    color:0x555555
+});
+
+
+const floorMat = new THREE.MeshStandardMaterial({
+    color:0x222222
+});
+
+
+function block(x,y,z,w,h,d,mat){
+
+    const geo = new THREE.BoxGeometry(
+        w,h,d
+    );
+
+    const mesh = new THREE.Mesh(
+        geo,
+        mat
+    );
+
+    mesh.position.set(
+        x,y,z
+    );
+
+    scene.add(mesh);
+
+}
+
+
+
+// floor
+
+block(
+    0,
+    0,
+    0,
+    30,
+    0.2,
+    30,
+    floorMat
+);
+
+
+// walls
+
+block(0,2,-15,30,4,0.5,wallMat);
+block(0,2,15,30,4,0.5,wallMat);
+
+block(-15,2,0,0.5,4,30,wallMat);
+block(15,2,0,0.5,4,30,wallMat);
+
+
+
+// random pillars
+
+for(let i=0;i<10;i++){
+
+    block(
+        Math.random()*20-10,
+        1,
+        Math.random()*20-10,
+        1,
+        2,
+        1,
+        wallMat
+    );
+
+}
+
+
+
+// =================
+// LIGHT
+// =================
+
+
+const light = new THREE.PointLight(
+    0xffffff,
+    80,
+    50
+);
+
+light.position.set(
+    0,
+    5,
+    0
+);
+
+scene.add(light);
+
+
+
+// =================
+// PLAYER
+// =================
+
+
+camera.position.set(
+    0,
+    1.7,
+    8
+);
+
+
+
+let keys = {};
+
+document.addEventListener(
+"keydown",
+e => keys[e.code]=true
+);
+
+document.addEventListener(
+"keyup",
+e => keys[e.code]=false
+);
+
+
+
+// mouse look
+
+let yaw = 0;
+let pitch = 0;
+
+
+document.body.onclick = () => {
+
+document.body.requestPointerLock();
+
+};
+
+
+
+document.addEventListener(
+"mousemove",
+e=>{
+
+if(document.pointerLockElement){
+
+yaw -= e.movementX * 0.002;
+
+pitch -= e.movementY * 0.002;
+
+
+pitch=Math.max(
+-1.5,
+Math.min(1.5,pitch)
+);
+
+
+camera.rotation.set(
+pitch,
+yaw,
+0
+);
+
+}
+
+});
+
+
+
+
+// movement
+
+function move(){
+
+let speed = 0.08;
+
+
+let direction =
+new THREE.Vector3();
+
+
+camera.getWorldDirection(
+direction
+);
+
+
+direction.y=0;
+
+direction.normalize();
+
+
+
+if(keys["KeyW"]){
+
+camera.position.addScaledVector(
+direction,
+speed
+);
+
+}
+
+
+if(keys["KeyS"]){
+
+camera.position.addScaledVector(
+direction,
+-speed
+);
+
+}
+
+
+
+let right =
+new THREE.Vector3();
+
+right.crossVectors(
+camera.up,
+direction
+);
+
+
+if(keys["KeyA"]){
+
+camera.position.addScaledVector(
+right,
+speed
+);
+
+}
+
+
+if(keys["KeyD"]){
+
+camera.position.addScaledVector(
+right,
+-speed
+);
+
+}
+
+
+}
+
+
+
+
+// =================
+// GAME LOOP
+// =================
+
+function animate(){
+
+requestAnimationFrame(
+animate
+);
+
+
+move();
+
+
+renderer.render(
+scene,
+camera
+);
+
+
+}
+
+
+animate();
+
+
+
+window.onresize=()=>{
+
+camera.aspect =
+window.innerWidth/window.innerHeight;
+
+camera.updateProjectionMatrix();
+
+
+renderer.setSize(
+window.innerWidth,
+window.innerHeight
+);
+
+};
+
+
+</script>
+
+</body>
+</html>
