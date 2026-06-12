@@ -1,30 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Dungeon Save System</title>
+<title>Room Dungeon FPS</title>
 
 <style>
-body {
-    margin: 0;
-    overflow: hidden;
-    font-family: sans-serif;
-}
-
-canvas {
-    display: block;
-}
+body { margin:0; overflow:hidden; }
+canvas { display:block; }
 
 #ui {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    color: white;
-    z-index: 10;
+position:absolute;
+top:10px;
+left:10px;
+color:white;
+z-index:10;
 }
 
 button {
-    margin-right: 5px;
-    padding: 6px 10px;
+margin-right:6px;
+padding:6px 10px;
 }
 </style>
 
@@ -35,7 +28,7 @@ button {
 <div id="ui">
 <button onclick="saveGame()">Save</button>
 <button onclick="loadGame()">Load</button>
-<button onclick="newGame()">New World</button>
+<button onclick="newGame()">New</button>
 </div>
 
 <script type="module">
@@ -43,36 +36,37 @@ button {
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160/build/three.module.js";
 
 
-// ==========================
-// GLOBAL STATE
-// ==========================
+// =====================
+// SEED SYSTEM
+// =====================
 
-let seed = Math.floor(Math.random() * 999999);
-let rand;
+let seed = Math.floor(Math.random()*999999);
 
-function RNG(s) {
-    return function () {
-        s = (s * 9301 + 49297) % 233280;
-        return s / 233280;
-    };
+function RNG(s){
+return function(){
+s=(s*9301+49297)%233280;
+return s/233280;
+};
 }
 
+let rand;
 
-// ==========================
+
+// =====================
 // THREE SETUP
-// ==========================
+// =====================
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 
 const renderer = new THREE.WebGLRenderer();
-renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setSize(innerWidth,innerHeight);
 document.body.appendChild(renderer.domElement);
 
 
-// ==========================
-// PLAYER CAMERA SYSTEM
-// ==========================
+// =====================
+// PLAYER + CAMERA
+// =====================
 
 const player = new THREE.Object3D();
 scene.add(player);
@@ -81,80 +75,129 @@ const yaw = new THREE.Object3D();
 const pitch = new THREE.Object3D();
 
 const camera = new THREE.PerspectiveCamera(
-75,
-window.innerWidth / window.innerHeight,
-0.1,
-1000
+75,innerWidth/innerHeight,0.1,1000
 );
 
 pitch.add(camera);
 yaw.add(pitch);
 player.add(yaw);
 
-player.position.set(0, 2, 0);
+player.position.set(0,2,0);
 
 
-// ==========================
-// LIGHT
-// ==========================
+// =====================
+// FLASHLIGHT (LOOK DIRECTION LIGHT)
+// =====================
 
-const light = new THREE.PointLight(0xffffff, 80, 120);
-light.position.set(0, 10, 0);
-scene.add(light);
+const flashlight = new THREE.SpotLight(
+0xffffff,
+140,
+70,
+Math.PI/5,
+0.4
+);
+
+camera.add(flashlight);
+camera.add(flashlight.target);
 
 
-// ==========================
-// DUNGEON
-// ==========================
+// =====================
+// LIGHT AMBIENCE
+// =====================
 
-const size = 31;
-let grid = [];
-let colliders = [];
+scene.add(new THREE.AmbientLight(0x111111));
 
-const wallMat = new THREE.MeshStandardMaterial({ color: 0x555555 });
-const floorMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
 
+// =====================
+// DUNGEON DATA
+// =====================
+
+const size = 35;
 const cellSize = 2;
 
+let grid = [];
+let rooms = [];
+let colliders = [];
 
-// ==========================
-// GENERATE DUNGEON (SEEDED)
-// ==========================
+const wallMat = new THREE.MeshStandardMaterial({color:0x555555});
+const floorMat = new THREE.MeshStandardMaterial({color:0x222222});
 
-function generateDungeon() {
+
+// =====================
+// ROOM GENERATION
+// =====================
+
+function generateDungeon(){
 
 rand = RNG(seed);
 
 grid = [];
-colliders = [];
+rooms = [];
 
-// fill with walls
-for (let x = 0; x < size; x++) {
-    grid[x] = [];
-    for (let z = 0; z < size; z++) {
-        grid[x][z] = 1;
-    }
+// fill walls
+for(let x=0;x<size;x++){
+grid[x]=[];
+for(let z=0;z<size;z++){
+grid[x][z]=1;
+}
 }
 
-// start position
-let x = Math.floor(size / 2);
-let z = Math.floor(size / 2);
 
-grid[x][z] = 0;
+// ---------------------
+// CREATE ROOMS
+// ---------------------
 
-// carve tunnels
-for (let i = 0; i < 900; i++) {
+let roomCount = 6 + Math.floor(rand()*5);
 
-    let r = rand();
-    if (r < 0.25) x++;
-    else if (r < 0.5) x--;
-    else if (r < 0.75) z++;
-    else z--;
+for(let i=0;i<roomCount;i++){
 
-    x = Math.max(1, Math.min(size - 2, x));
-    z = Math.max(1, Math.min(size - 2, z));
+let w = 4 + Math.floor(rand()*6);
+let h = 4 + Math.floor(rand()*6);
 
-    grid[x][z] = 0;
+let x = Math.floor(rand()*(size-w-2))+1;
+let z = Math.floor(rand()*(size-h-2))+1;
+
+rooms.push({x,z,w,h});
+
+// carve room
+for(let rx=0;rx<w;rx++){
+for(let rz=0;rz<h;rz++){
+grid[x+rx][z+rz]=0;
+}
+}
+
+}
+
+
+// ---------------------
+// CONNECT ROOMS
+// ---------------------
+
+for(let i=0;i<rooms.length-1;i++){
+
+let a = rooms[i];
+let b = rooms[i+1];
+
+let ax = a.x + Math.floor(a.w/2);
+let az = a.z + Math.floor(a.h/2);
+
+let bx = b.x + Math.floor(b.w/2);
+let bz = b.z + Math.floor(b.h/2);
+
+// horizontal corridor
+while(ax !== bx){
+grid[ax][az]=0;
+ax += ax < bx ? 1 : -1;
+}
+
+// vertical corridor
+while(az !== bz){
+grid[ax][az]=0;
+az += az < bz ? 1 : -1;
+}
+
+grid[ax][az]=0;
+
 }
 
 buildWorld();
@@ -162,128 +205,82 @@ buildWorld();
 }
 
 
-// ==========================
-// BUILD WORLD FROM GRID
-// ==========================
+// =====================
+// WORLD BUILDER
+// =====================
 
-function buildWorld() {
+function buildWorld(){
 
-// clear old objects
-for (let obj of scene.children) {
-    if (obj.isMesh) scene.remove(obj);
+// clear meshes
+for(let i=scene.children.length-1;i>=0;i--){
+if(scene.children[i].isMesh)
+scene.remove(scene.children[i]);
 }
 
 colliders = [];
 
-// rebuild lights
-scene.add(light);
+// ambient light
+scene.add(new THREE.AmbientLight(0x111111));
 
-for (let x = 0; x < size; x++) {
-    for (let z = 0; z < size; z++) {
+for(let x=0;x<size;x++){
+for(let z=0;z<size;z++){
 
-        const wx = (x - size / 2) * cellSize;
-        const wz = (z - size / 2) * cellSize;
+let wx = (x-size/2)*cellSize;
+let wz = (z-size/2)*cellSize;
 
-        if (grid[x][z] === 1) {
+if(grid[x][z]===1){
 
-            const wall = new THREE.Mesh(
-                new THREE.BoxGeometry(cellSize, 3, cellSize),
-                wallMat
-            );
+let wall = new THREE.Mesh(
+new THREE.BoxGeometry(cellSize,3,cellSize),
+wallMat
+);
 
-            wall.position.set(wx, 1.5, wz);
-            scene.add(wall);
-            colliders.push(wall);
+wall.position.set(wx,1.5,wz);
 
-        } else {
+scene.add(wall);
+colliders.push(wall);
 
-            const floor = new THREE.Mesh(
-                new THREE.BoxGeometry(cellSize, 0.2, cellSize),
-                floorMat
-            );
+}else{
 
-            floor.position.set(wx, 0, wz);
-            scene.add(floor);
+let floor = new THREE.Mesh(
+new THREE.BoxGeometry(cellSize,0.2,cellSize),
+floorMat
+);
 
-        }
+floor.position.set(wx,0,wz);
 
-    }
+scene.add(floor);
+
+}
+
+}
 }
 
 }
 
 
-// ==========================
-// SAVE / LOAD SYSTEM
-// ==========================
+// =====================
+// INPUT
+// =====================
 
-window.saveGame = function () {
+let keys={};
 
-const data = {
-    seed: seed,
-    x: player.position.x,
-    y: player.position.y,
-    z: player.position.z
-};
+addEventListener("keydown",e=>keys[e.code]=true);
+addEventListener("keyup",e=>keys[e.code]=false);
 
-localStorage.setItem("dungeonSave", JSON.stringify(data));
+document.body.onclick=()=>document.body.requestPointerLock();
 
-alert("Game Saved!");
+let yawRot=0;
+let pitchRot=0;
 
-};
+addEventListener("mousemove",e=>{
 
+if(document.pointerLockElement){
 
-window.loadGame = function () {
+yawRot -= e.movementX*0.002;
+pitchRot -= e.movementY*0.002;
 
-const data = JSON.parse(localStorage.getItem("dungeonSave"));
-
-if (!data) {
-    alert("No save found!");
-    return;
-}
-
-seed = data.seed;
-player.position.set(data.x, data.y, data.z);
-
-generateDungeon();
-
-alert("Game Loaded!");
-
-};
-
-
-window.newGame = function () {
-
-seed = Math.floor(Math.random() * 999999);
-player.position.set(0, 2, 0);
-
-generateDungeon();
-
-};
-
-
-// ==========================
-// CONTROLS
-// ==========================
-
-let keys = {};
-
-document.addEventListener("keydown", e => keys[e.code] = true);
-document.addEventListener("keyup", e => keys[e.code] = false);
-
-document.body.onclick = () => document.body.requestPointerLock();
-
-let yawRot = 0;
-let pitchRot = 0;
-
-document.addEventListener("mousemove", e => {
-
-if (document.pointerLockElement) {
-
-yawRot -= e.movementX * 0.002;
-pitchRot -= e.movementY * 0.002;
-
-pitchRot = Math.max(-1.5, Math.min(1.5, pitchRot));
+pitchRot = Math.max(-1.5,Math.min(1.5,pitchRot));
 
 yaw.rotation.y = yawRot;
 pitch.rotation.x = pitchRot;
@@ -293,13 +290,40 @@ pitch.rotation.x = pitchRot;
 });
 
 
-// ==========================
+// =====================
+// COLLISION
+// =====================
+
+const playerBox = new THREE.Box3();
+
+function canMove(pos){
+
+playerBox.setFromCenterAndSize(
+new THREE.Vector3(pos.x,pos.y,pos.z),
+new THREE.Vector3(0.6,1.8,0.6)
+);
+
+for(let obj of colliders){
+
+let box = new THREE.Box3().setFromObject(obj);
+
+if(playerBox.intersectsBox(box))
+return false;
+
+}
+
+return true;
+
+}
+
+
+// =====================
 // MOVEMENT
-// ==========================
+// =====================
 
-function move() {
+function move(){
 
-let speed = 0.1;
+let speed = 0.09;
 
 let forward = new THREE.Vector3();
 camera.getWorldDirection(forward);
@@ -307,48 +331,95 @@ forward.y = 0;
 forward.normalize();
 
 let right = new THREE.Vector3();
-right.crossVectors(camera.up, forward);
+right.crossVectors(camera.up,forward);
 
 let move = new THREE.Vector3();
 
-if (keys.KeyW) move.add(forward);
-if (keys.KeyS) move.sub(forward);
-if (keys.KeyA) move.add(right);
-if (keys.KeyD) move.sub(right);
+if(keys.KeyW)move.add(forward);
+if(keys.KeyS)move.sub(forward);
+if(keys.KeyA)move.add(right);
+if(keys.KeyD)move.sub(right);
 
-player.position.add(move.multiplyScalar(speed));
+move.normalize().multiplyScalar(speed);
+
+let next = player.position.clone().add(move);
+
+if(canMove(next)){
+player.position.copy(next);
+}
 
 }
 
 
-// ==========================
-// LOOP
-// ==========================
+// =====================
+// SAVE / LOAD
+// =====================
 
-function animate() {
+window.saveGame = function(){
+
+localStorage.setItem("dungeonSave",JSON.stringify({
+seed,
+x:player.position.x,
+y:player.position.y,
+z:player.position.z
+}));
+
+};
+
+window.loadGame = function(){
+
+let d = JSON.parse(localStorage.getItem("dungeonSave"));
+if(!d) return;
+
+seed = d.seed;
+player.position.set(d.x,d.y,d.z);
+
+generateDungeon();
+
+};
+
+window.newGame = function(){
+
+seed = Math.floor(Math.random()*999999);
+player.position.set(0,2,0);
+generateDungeon();
+
+};
+
+
+// =====================
+// GAME LOOP
+// =====================
+
+function animate(){
 
 requestAnimationFrame(animate);
 
 move();
 
-renderer.render(scene, camera);
+// 🔦 flashlight follows EXACT view direction automatically
+flashlight.position.set(0,0,0);
+flashlight.target.position.set(0,0,-1);
+
+renderer.render(scene,camera);
 
 }
 
 animate();
 
 
-// start game
-generateDungeon();
+// resize
+addEventListener("resize",()=>{
 
-
-window.addEventListener("resize", () => {
-
-camera.aspect = window.innerWidth / window.innerHeight;
+camera.aspect = innerWidth/innerHeight;
 camera.updateProjectionMatrix();
-renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setSize(innerWidth,innerHeight);
 
 });
+
+
+// start
+generateDungeon();
 
 </script>
 
